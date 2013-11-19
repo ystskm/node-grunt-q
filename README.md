@@ -43,21 +43,21 @@ q = gruntQ([options][, callback])
 ###Arguments  
 **options** (Number|Array|Object) `{q:1}` optional  
 Options for creating queues.
-_If a `Number` or an `Array` is given, it treats as value of **q**_  
+_If a [Number] or an [[Array]] is given, it treats as value of **q**_  
 - __q__ (Number|Object|Array): statuses of queue(s) creating  
-    e.g. `4`  
+    `4`  
      four queues will be created with from rank 0 (lowest) to rank 3 (high)  
-    e.g. `{ maxQueue: 8 }`  
+    `{ maxQueue: 8 }`  
      a queue will be created with rank 0, max queue count 8.  
-    e.g. `[{}, { maxQueue: 4 }]`  
+    `[{}, { maxQueue: 4 }]`  
      a queue with rank 0, unlimited queue count and a queue with rank 1, max queue count 4.  
   
 - _maxWorker_ (Number|Boolean): max worker count for execute tasks. it is limited by the number of cpus.
-    e.g. `2`  
+    `2`  
      two workers will be created if the number of cpus >= 2.  
-    e.g. `true`, `null` or `undefined`  
+    `true`, `null` or `undefined`  
      `require('os').cpus()` workers will be created.  
-    e.g. `false`  
+    `false`  
      not using child_process to execute task.  
   
 *callback* (Function) `function(err){}` optional  
