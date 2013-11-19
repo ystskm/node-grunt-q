@@ -11,21 +11,21 @@ Install with [npm](http://npmjs.org/):
 
 ## Example code
 ```js
-var GQ = require('grunt-q')(4);
+var q = require('grunt-q')(4);
 require('http').createServer(function(req, res) {
   switch(req.header('request-type')) {
   case 'queuing':
-    GQ.push(req.header('grunt-task-params')).on('end', function(id, stat) {
+    q.enqueue(req.header('grunt-task-params')).on('end', function(id, stat) {
       res.send('Task is in-queue as id: ' + id);
     });
     break;
   case 'stat':
-    GQ.confirm(req.header('grunt-task-id')).on('end', function(stat) {
+    q.confirm(req.header('grunt-task-id')).on('end', function(stat) {
       res.send('Task is: ' + stat.status());
     });
     break;
   case 'cancel':
-    GQ.dequeue(req.header('grunt-task-id')).on('end', function(){
+    q.dequeue(req.header('grunt-task-id')).on('end', function(){
       res.send('Task is canceled');
     });
     break;
@@ -41,25 +41,26 @@ q = gruntQ([options][, callback])
 ```
 
 ###Arguments  
-optional *options* (Number|Array|Object) `{q:1}`  
+**options** (Number|Array|Object) `{q:1}` optional  
 Options for creating queues.
-__If a `Number` or an `Array` is given, it treats as value of *q*__  
-  _q_ (Number|Object|Array): statuses of queue(s) creating  
-    `4`  
-    - four queues will be created with from rank 0 (lowest) to rank 3 (high)  
-    `{ maxQueue: 8 }`  
-    - a queue will be created with rank 0, max queue count 8.  
-    `[{}, { maxQueue: 4 }]`
-    - a queue with rank 0, unlimited queue count and a queue with rank 1, max queue count 4.
-  _maxWorker_ (Number|Boolean): max worker count for execute tasks. it is limited by the number of cpus.
-    `2`
-    - two workers will be created if the number of cpus >= 2.
-    `true` `null` `undefined`
-    - `require('os').cpus()` workers will be created.
-    `false`
-    - not using child_process to execute task.  
+_If a `Number` or an `Array` is given, it treats as value of **q**_  
+- __q__ (Number|Object|Array): statuses of queue(s) creating  
+    e.g. `4`  
+     four queues will be created with from rank 0 (lowest) to rank 3 (high)  
+    e.g. `{ maxQueue: 8 }`  
+     a queue will be created with rank 0, max queue count 8.  
+    e.g. `[{}, { maxQueue: 4 }]`  
+     a queue with rank 0, unlimited queue count and a queue with rank 1, max queue count 4.  
   
-optional *callback* (Function) `function(err){}`  
+- _maxWorker_ (Number|Boolean): max worker count for execute tasks. it is limited by the number of cpus.
+    e.g. `2`  
+     two workers will be created if the number of cpus >= 2.  
+    e.g. `true`, `null` or `undefined`  
+     `require('os').cpus()` workers will be created.  
+    e.g. `false`  
+     not using child_process to execute task.  
+  
+*callback* (Function) `function(err){}` optional  
 Callback when queue(s) are ready. See Events: ready for more info.
 
 ###Events  
