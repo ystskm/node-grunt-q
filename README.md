@@ -42,21 +42,22 @@ q = gruntQ([options][, callback])
 ```
 
 ###Arguments  
-- **options** ( Number | Array | Object ) `{q:1}` optional  
-Options for creating queues.  
-_If a Number or an Array is given, it treats as value of **q**_  
-__q__ (Number|Object|Array): statuses of queue(s) creating  
+**options** ( Number | Array | Object ) `{q:1}` optional  
+ Options for creating queues.  
+ _If a Number or an Array is given, it treats as value of **q**_  
+- __q__ (Number|Object|Array): statuses of queue(s) creating  
     `4`	Create four queues with from rank 0 (lowest) to rank 3 (high)  
     `{ maxQueue: 8 }`	Create a queue  with rank 0, max queue count 8.  
     `[{}, { maxQueue: 4 }]`	A queue with rank 0, unlimited queue count and a queue with rank 1, max queue count 4 will be created.  
   
-__maxWorker__ (Number|Boolean): max worker count for execute tasks. it is limited by the number of cpus.
+- __maxWorker__ (Number|Boolean): max worker count for execute tasks. it is limited by the number of cpus.
     `2`	two workers will be created if the number of cpus >= 2.  
     `true`, `null` or `undefined`	`require('os').cpus()` workers will be created.  
     `false`	not using child_process to execute task.  
   
-- **callback** ( Function ) `function(err){}` optional  
-Callback function when queue(s) are ready. See **Events type `ready`** for more info.
+**callback** ( Function ) `function(err){}` optional  
+ Callback function when queue(s) are ready.  
+ See `Events.ready` for more info.
 
 ###Events  
 A grunt-q is an instance of EventEmitter.  
