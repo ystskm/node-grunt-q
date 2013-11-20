@@ -109,7 +109,7 @@ function chkReady(q, t) {
 function chkProgress(q, t, task_id, task_ids) {
 
   // task_id has been returned after enqueue
-  t.ok(~task_ids.indexOf(task_id), 'Task#' + task_id + ' is end.');
+  t.ok(~task_ids.indexOf(task_id), 'Task #' + task_id + ' is end.');
 
   t.equal(GQ.Task.countAlives(), task_ids.length);
   q.dequeue(task_id);
