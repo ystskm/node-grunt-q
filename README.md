@@ -67,8 +67,6 @@ type `ready`
   ```
   q.on('ready', function(){ ... } );
   ```
-  _Note that you can `.enqueue()` without waiting event `ready`._  
-  _Before ready, tasks are waiting ready automatically._  
   
 type `progress`  
   Emits when progress to next task.  
@@ -89,6 +87,8 @@ See the [readme](https://github.com/ystskm/node-grunt-runner/blob/master/README.
 ```js
 q.enqueue([pkg,] task_configuration [, options][, callback]);
 ```
+_Note that you can `.enqueue()` without waiting event `ready`._  
+_Before ready, tasks are waiting ready automatically._  
   
 ## API - confirm task condition
 ###Query
