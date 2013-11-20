@@ -112,7 +112,7 @@ function chkProgress(q, t, task_id, task_ids) {
   t.ok(~task_ids.indexOf(task_id), 'Task#' + task_id + ' is end.');
 
   t.equal(GQ.Task.countAlives(), task_ids.length);
-  q.dequeue(task_id);
+  q.dequeue(task_id); // TODO occasionally happens error?
 
   // dequeue twice is not allowed
   try {
