@@ -1,5 +1,7 @@
 # grunt-q
   
+[![Build status](https://travis-ci.org/ystskm/node-grunt-q.png)](https://travis-ci.org/ystskm/node-grunt-q)  
+  
 Support for queueing grunt task with using cluster.  
 Ranked queue is also supported.
 
@@ -21,14 +23,11 @@ require('http').createServer(function(req, res) {
     });
     break;
   case 'stat':
-    q.confirm(req.header('grunt-task-id')).on('end', function(stat) {
-      res.send('Task is: ' + stat.status());
-    });
+    res.send(q.confirm(req.header('grunt-task-id')));
     break;
   case 'cancel':
-    q.dequeue(req.header('grunt-task-id')).on('end', function(){
-      res.send('Task is canceled');
-    });
+    q.dequeue(req.header('grunt-task-id'));
+    res.send('Task is canceled');
     break;
   default:
     res.send('No such operation');
