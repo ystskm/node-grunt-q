@@ -18,8 +18,8 @@ var q = require('grunt-q')(4);
 require('http').createServer(function(req, res) {
   switch(req.header('request-type')) {
   case 'queuing':
-    q.enqueue(req.header('grunt-task-params')).on('end', function(id, stat) {
-      res.send('Task is in-queue as id: ' + id);
+    q.enqueue(req.header('grunt-task-params')).on('end', function(task_id, task) {
+      res.send('Task is in-queue as #' + task_id);
     });
     break;
   case 'stat':
@@ -73,24 +73,36 @@ type `ready`
 type `progress`  
   Emits when progress to next task.  
   ```
-  q.on('progress', function(rank, stat){ ... } );
+  q.on('progress', function(task_id, task){ ... } );
   ```
-  
 type `error`  
   Emits when some error occurs.  
   ```
   q.on('error', function(err, [task]){ ... } );
   ```
+  
+Other events are bridged from __grunt-runner__.  
+See the [readme](https://github.com/ystskm/node-grunt-runner/blob/master/README.md)
+
 ## API - enqueue tasks
 ###Query
 ```js
 q.enqueue(tasks[, options][, callback]);
 ```
-
+  
 ## API - confirm task condition
 ###Query
 ```js
-q.confirm(task_id[, callback]);
+q.confirm(task_id[,raw]);
 ```
+The return value value is `'pending'`, `'processing'` or `'finished'`.
+If you set `true` to the **raw**, you can get Task object and use the functions. (e.g. `.status()`, `.rank()` )  
   
+## API - dequeue and remove task
+###Query
+```js
+q.dequeue(task_id);
+```
+You can remove the status of a Task, release from taskmap, and saving memory use.  
+After that, you cannot `.confirm()` for the task any more, if you do that, an error will be thrown.  
   
