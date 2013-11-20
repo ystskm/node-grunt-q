@@ -17,28 +17,32 @@ An exsample for creating task run server.
 var q = require('grunt-q')(4);
 require('http').createServer(function(req, res) {
   switch(req.header('request-type')) {
+  
   case 'queuing':
     q.enqueue(req.header('grunt-task-params')).on('end', function(task_id, task) {
       res.send('Task is in-queue as #' + task_id);
     });
     break;
+    
   case 'stat':
     res.send(q.confirm(req.header('grunt-task-id')));
     break;
+    
   case 'cancel':
     q.dequeue(req.header('grunt-task-id'));
     res.send('Task is canceled');
     break;
+    
   default:
     res.send('No such operation');
   }
 });
 ```
 
-## API - crating queues
+## API - creating queues
 ###Query
 ```js
-q = gruntQ([options][, callback])
+q = gruntQ([options])
 ```
 
 ###Arguments  
@@ -54,10 +58,6 @@ q = gruntQ([options][, callback])
     `2`	two workers will be created if the number of cpus >= 2.  
     `true`, `null` or `undefined`	`require('os').cpus()` workers will be created.  
     `false`	not using child_process to execute task.  
-  
-**callback** ( Function ) `function(err){}` optional  
- Callback function when queue(s) are ready.  
- See `Events.ready` for more info.
 
 ###Events  
 A grunt-q is an instance of EventEmitter.  
@@ -84,10 +84,10 @@ type `error`
 Other events are bridged from __grunt-runner__.  
 See the [readme](https://github.com/ystskm/node-grunt-runner/blob/master/README.md)
 
-## API - enqueue tasks
+## API - enqueue a task
 ###Query
 ```js
-q.enqueue(tasks[, options][, callback]);
+q.enqueue([pkg,] task_configuration [, options][, callback]);
 ```
   
 ## API - confirm task condition

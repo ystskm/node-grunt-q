@@ -8,15 +8,15 @@ var gr = require('grunt-runner'), _ = gr._, eventDrive = _.eventDrive;
 module.exports = gruntQ;
 gruntQ.SimpleQ = SimpleQ, gruntQ.Task = Task;
 
-function gruntQ(options, callback) {
+function gruntQ(options) {
 
   if(!(this instanceof gruntQ))
-    return new gruntQ(options, callback);
+    return new gruntQ(options);
 
   Emitter.call(this);
 
   // queue and finished task map
-  _init(this), this.create(options, callback);
+  _init(this), this.create(options);
 
 }
 inherits(gruntQ, Emitter);
@@ -31,14 +31,12 @@ var QProtos = {
 for( var i in QProtos)
   gruntQ.prototype[i] = QProtos[i];
 
-function create(options, callback) {
+function create(options) {
 
   var self = this, Q = self._q;
 
   // fix argument
-  if(typeof options == 'function')
-    callback = options, options = {};
-  else if(Array.isArray(options))
+  if(Array.isArray(options))
     options = {
       q: options
     };
