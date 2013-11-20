@@ -16,26 +16,30 @@ An exsample for creating task run server.
 ```js
 var q = require('grunt-q')(4);
 require('http').createServer(function(req, res) {
-  switch(req.header('request-type')) {
+req.on('readable', function(){
+  
+  var p = JSON.parse(req.read().toString());
+  
+  switch(p['request-type'])) {
   
   case 'queuing':
-    q.enqueue(req.header('grunt-task-params')).on('end', function(task_id, task) {
+    q.enqueue(p['grunt-task-params']).on('end', function(task_id, task) {
       res.send('Task is in-queue as #' + task_id);
     });
     break;
     
   case 'stat':
-    res.send(q.confirm(req.header('grunt-task-id')));
+    res.send(q.confirm(p['grunt-task-id']));
     break;
     
   case 'cancel':
-    q.dequeue(req.header('grunt-task-id'));
-    res.send('Task is canceled');
+    q.dequeue(p['grunt-task-id']), res.send('Task is canceled');
     break;
     
   default:
     res.send('No such operation');
   }
+});
 });
 ```
 
