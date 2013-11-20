@@ -15,7 +15,7 @@ module.exports = nodeunit.testCase({
       t.equal(pkgc.taskList.shift(), name);
     }).on('progress', function(task_id) {
       chkProgress(q, t, task_id, task_ids);
-      q.destroy(), t.ok(true, 'two-tasks: going to done.');
+      q.destroy(), t.ok(true, 'one-task: going to done.');
       t.done();
     }));
 
