@@ -17,9 +17,7 @@ An exsample for creating task run server.
 var q = require('grunt-q')(4);
 require('http').createServer(function(req, res) {
 req.on('readable', function(){
-  
   var p = JSON.parse(req.read().toString());
-  
   switch(p['request-type'])) {
   
   case 'queuing':
@@ -38,6 +36,7 @@ req.on('readable', function(){
     
   default:
     res.send('No such operation');
+  
   }
 });
 });
