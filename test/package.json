@@ -1,0 +1,8 @@
+{
+  "name": "grunt-q-test-prepare",
+  "version": "0.9.0",
+  "devDependencies": {
+    "grunt-contrib-concat": "*",
+    "grunt-contrib-uglify": "*"
+  }
+}

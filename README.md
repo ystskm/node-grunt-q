@@ -37,6 +37,7 @@ require('http').createServer(function(req, res) {
 ```
 
 ## API - crating queues
+###Query
 ```js
 q = gruntQ([options][, callback])
 ```
@@ -68,7 +69,7 @@ type `ready`
   q.on('ready', function(){ ... } );
   ```
   _Note that you can `.enqueue()` without waiting event `ready`._  
-  _Before ready, tasks are queued internally._  
+  _Before ready, tasks are waiting ready automatically._  
   
 type `progress`  
   Emits when progress to next task.  
@@ -81,6 +82,16 @@ type `error`
   ```
   q.on('error', function(err, [task]){ ... } );
   ```
-  
+## API - enqueue tasks
+###Query
+```js
+q.enqueue(tasks[, options][, callback]);
+```
+
+## API - confirm task condition
+###Query
+```js
+q.confirm(task_id[, callback]);
+```
   
   

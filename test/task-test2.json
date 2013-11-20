@@ -1,0 +1,5 @@
+{
+  "name": "grunt-q-test2",
+  "taskList": ["concat-uglify", "run"],
+  "configure": {}
+}

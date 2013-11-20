@@ -9,7 +9,7 @@
   "contributors": [],
   "description": "Support for queueing grunt task with using cluster.",
   "dependencies": {
-    "grunt-runner":">=1.0.0"
+    "grunt-runner":">=1.0.3"
   },
   "devDependencies": {
     "nodeunit": "*",
