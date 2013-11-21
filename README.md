@@ -1,8 +1,7 @@
-# grunt-q
+# [![GitHub](https://travis-ci.org/images/icons/github.png)](https://github.com/ystskm/node-grunt-q) grunt-q
   
 [![Version](https://badge.fury.io/js/grunt-q.png)](https://npmjs.org/package/grunt-q)
 [![Build status](https://travis-ci.org/ystskm/node-grunt-q.png)](https://travis-ci.org/ystskm/node-grunt-q)
-[![GitHub](https://travis-ci.org/images/icons/github.png)](https://github.com/ystskm/node-grunt-q)  
   
 Support for queueing grunt task with using cluster.  
 Ranked queue is also supported.
