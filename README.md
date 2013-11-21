@@ -1,4 +1,4 @@
-# (https://github.com/ystskm/node-grunt-q) grunt-q
+#grunt-q
   
 [![Version](https://badge.fury.io/js/grunt-q.png)](https://npmjs.org/package/grunt-q)
 [![Build status](https://travis-ci.org/ystskm/node-grunt-q.png)](https://travis-ci.org/ystskm/node-grunt-q)
