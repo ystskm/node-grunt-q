@@ -109,9 +109,12 @@ q.enqueue('package-for-task1.json', {(some configuration)});
   { "name": "task1", "taskList": ["subtask1", "subtask2"] }
 */
 ```
-,or you can write
+or, you can write this alternatively
 ```js
-q.enqueue({pkg: {name: 'task1', taskList: ['subtask1', 'subtask2']}, (some configuration)});
+q.enqueue({
+    pkg: {name: 'task1', taskList: ['subtask1', 'subtask2']}
+  , (some configuration)
+});
 ```
   
 ## API - confirm task condition
