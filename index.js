@@ -6,7 +6,7 @@ var SimpleQ = require('./lib/SimpleQ'), Task = require('./lib/Task'), WorkerGrou
 // depended utilities
 var gr = require('grunt-runner'), _ = gr._, eventDrive = _.eventDrive;
 module.exports = gruntQ;
-gruntQ.SimpleQ = SimpleQ, gruntQ.Task = Task;
+gruntQ._ = _, gruntQ.SimpleQ = SimpleQ, gruntQ.Task = Task;
 
 function gruntQ(options) {
 
