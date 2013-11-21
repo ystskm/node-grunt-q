@@ -90,6 +90,7 @@ module.exports = nodeunit.testCase({
             t.equal(e, 0);
             t.equal(data.state, 'error');
             t.ok(data.progress instanceof Error);
+            q.destroy(), t.ok(true, 'error-task: going to done.');
             t.done();
           });
         }, 5000);
