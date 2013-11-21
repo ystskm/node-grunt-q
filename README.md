@@ -88,7 +88,7 @@ See the [readme](https://github.com/ystskm/node-grunt-runner/blob/master/README.
 ## API - enqueue a task
 ###Query
 ```js
-q.enqueue([pkg,] task_configuration [, options][, callback]);
+q.enqueue([pkg_file_path,] task_configuration [, options][, callback]);
 ```
 _Note that you can `.enqueue()` without waiting event `ready`._  
 _Before ready, tasks are waiting ready automatically._  

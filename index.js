@@ -25,6 +25,7 @@ var QProtos = {
   create: create,
   enqueue: enqueue,
   confirm: confirm,
+  taskProgress: taskProgress,
   dequeue: dequeue,
   destroy: destroy
 };
@@ -52,7 +53,7 @@ function create(options) {
     taskPerWorker: 1
   }, options || {});
 
-  // fix queue status
+  // fix queue state
   if(!Array.isArray(opts.q))
     opts.q = [opts.q];
   opts.q = opts.q.map(function(v, i) {
@@ -96,16 +97,18 @@ function create(options) {
 
       // set worker status
       var tpw = opts.taskPerWorker;
-      worker.working = {}, worker.max_working = tpw[i] || tpw;
+      worker.working = {}, worker.callback = {};
+      worker.max_working = tpw[i] || tpw;
 
       // catch worker message
       worker.on('message', function(msg) {
 
-        var worker = this;
+        var worker = this, callback = worker.callback[msg._cid];
+        if(typeof callback == 'function') // callback pattern
+          return delete worker.callback[msg._cid], callback(msg);
 
-        if(msg.type == 'error') {
+        if(msg.type == 'error')
           return self.emit('error', msg.args[0], msg.args[1]);
-        }
 
         if(msg.type == 'end') {
 
@@ -115,15 +118,16 @@ function create(options) {
           var task = Task.getById(task_id);
           if(task) {
             self._q[task.rank()].dequeue(task);
-            task.status('finished'), self._fq[task_id] = task;
+            task.state('finished'), self._fq[task_id] = task;
           }
 
           // TODO !task
           self.emit('_progress', msg.args[0], msg.args[1]), _nextTask(self);
+          return;
 
         }
 
-        return self.emit('data', msg.args);
+        return self.emit('data', msg.type, msg.args);
 
       });
 
@@ -146,7 +150,7 @@ function _nextTask(self) {
   if(worker == null)
     return self.emit('busy');
   worker.send({
-    _id: task._id,
+    task_id: task._id,
     task: task.read()
   });
 
@@ -221,7 +225,58 @@ function enqueue(pkg, commands, opts, callback, _emitter_) {
 
 function confirm(task_id, raw) {
   var task = _seekTaskById(this, task_id);
-  return task && (raw ? task: task.status());
+  return task && (raw ? task: task.state());
+}
+
+function taskProgress(task_id, callback) {
+
+  var self = this, line = [], ee = null;
+  var task = _seekTaskById(this, task_id), state = null, worker = null;
+
+  line.push(_.caught(function(next) {
+    if(!task)
+      return end('not-in-queue');
+    state = task.state();
+    if(state == 'pending')
+      return end('pending', 0);
+    if(state == 'finished')
+      return end('finished', 100);
+    next();
+  }, error));
+
+  line.push(_.caught(function(next) {
+    _forEachWorker(self, function(targ) {
+      targ.working[task_id] && (worker = targ);
+    });
+    if(!worker)
+      return end('memory-trash');
+    next();
+  }, error));
+
+  line.push(_.caught(function() {
+    var _cid = Task.idGen();
+    worker.callback[_cid] = function(msg) {
+      end(state, msg.data);
+    };
+    worker.send({
+      cmd: 'taskProgress',
+      _id: _cid,
+      task_id: task_id
+    });
+  }, error));
+
+  return ee = _.eventDrive(line, callback);
+
+  function error(e) {
+    ee.emit('error', e);
+  }
+  function end(state, progress, info) {
+    ee.emit('end', _.extend({
+      state: state,
+      progress: progress
+    }, info));
+  }
+
 }
 
 function dequeue(task_id) {
@@ -233,14 +288,14 @@ function dequeue(task_id) {
     if(task == null)
       throw new Error('The task is not found. Task#' + task_id);
 
-    if(task.status() === 'pending')
+    if(task.state() === 'pending')
       return task.destroy(), self._q[task.rank()].dequeue(task);
 
-    if(task.status() === 'finished')
+    if(task.state() === 'finished')
       return task.destroy(), delete self._fq[task_id];
 
     // processing, or other
-    throw new Error('Unable to dequeue status: ' + task.status());
+    throw new Error('Unable to dequeue state: ' + task.state());
 
   });
 }
@@ -260,7 +315,7 @@ function _seekNextTask(self) {
   var ra = self._q.length - 1;
   while(ra >= 0) {
     var nextTask = self._q[ra].next(function(task) {
-      return task.status() == 'pending';
+      return task.state() == 'pending';
     });
     if(nextTask)
       return nextTask;
@@ -278,8 +333,8 @@ function _seekAvailWorker(self, task) {
       worker.working[task._id] = setTimeout(function() {
         self.emit('timeout', task), self.dequeue(task._id);
       }, task.timeout());
-      // set begin time and status
-      task.timer(new Date()), task.status('processing');
+      // set begin time and state
+      task.timer(new Date()), task.state('processing');
       return worker;
     }
     worker = null, idx++;
@@ -296,4 +351,8 @@ function _seekTaskById(self, task_id) {
 function _init(self) {
   self._q = [], self._fq = {}, self._workers = [], self._worker_idx = 0;
   self._ready = [], delete self._wg;
+}
+
+function _forEachWorker(self, fn) {
+  self._workers.forEach(fn);
 }

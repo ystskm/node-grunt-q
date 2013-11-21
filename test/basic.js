@@ -11,8 +11,10 @@ module.exports = nodeunit.testCase({
     var pkgc = JSON.parse(fs.readFileSync(pkgj).toString());
     _bindLogging(q.on('ready', function() {
       chkReady(q, t);
-    }).on('finish', function(name) {
-      t.equal(pkgc.taskList.shift(), name);
+    }).on('data', function(type, args) {
+      type == 'finish' && (function(name) {
+        t.equal(pkgc.taskList.shift(), name);
+      })(args[0]);
     }).on('progress', function(task_id) {
       chkProgress(q, t, task_id, task_ids);
       q.destroy(), t.ok(true, 'one-task: going to done.');
@@ -38,9 +40,12 @@ module.exports = nodeunit.testCase({
 
     _bindLogging(q.on('ready', function() {
       chkReady(q, t);
-    }).on('finish', function(name) {
+    }).on('data', function(type, args) {
       var pkgc = (pkgcs[0].taskList.length == 0 ? pkgcs.shift(): pkgcs[0]);
-      t.equal(pkgc.taskList.shift(), name);
+      type == 'finish' && (function(name) {
+        var pkgc = pkgcs[pkgcs[0].taskList[0] == name ? 0: 1];
+        t.equal(pkgc.taskList.shift(), name);
+      })(args[0]);
     }).on('progress', function(task_id) {
       chkProgress(q, t, task_id, task_ids);
       if(task_ids.length == 0) {
