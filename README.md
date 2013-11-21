@@ -50,8 +50,8 @@ q = gruntQ([options])
 
 ###Arguments  
 **options** ( Number | Array | Object ) `{q:1}` optional  
- Options for creating queues.  
- _If a Number or an Array is given, it treats as value of **q**_  
+Options for creating queues.  
+_If a Number or an Array is given, it treats as value of **q**_  
 - __q__ (Number|Object|Array): statuses of queue(s) creating  
     `4`	Create four queues with from rank 0 (lowest) to rank 3 (high)  
     `{ maxQueue: 8 }`	Create a queue  with rank 0, max queue count 8.  
@@ -82,8 +82,14 @@ type `error`
   q.on('error', function(err, [task]){ ... } );
   ```
   
-Other events are bridged from __grunt-runner__.  
-See the [readme](https://github.com/ystskm/node-grunt-runner/blob/master/README.md)
+Other events are bridged from __grunt-runner__ as type `data`.  
+type `data`
+  Emits when some error occurs.  
+  ```
+  q.on('data', function(type, args){ ... } );
+  ```
+  
+See [readme](https://github.com/ystskm/node-grunt-runner/blob/master/README.md) for more information about other events.
 
 ## API - enqueue a task
 ###Query
@@ -92,6 +98,21 @@ q.enqueue([pkg_file_path,] task_configuration [, options][, callback]);
 ```
 _Note that you can `.enqueue()` without waiting event `ready`._  
 _Before ready, tasks are waiting ready automatically._  
+  
+###Arguments
+**pkg_file_path** ( String ) `package.json` _optional_  
+Specify the task package file. It's _optional_ because it's not required that you
+ take a time for writing `package.json`.  
+```js
+q.enqueue('package-for-task1.json', {(some configuration)});
+/* contents of package-for-task1.json:
+  { "name": "task1", "taskList": ["subtask1", "subtask2"] }
+*/
+```
+,or you can write
+```js
+q.enqueue({pkg: {name: 'task1', taskList: ['subtask1', 'subtask2']}, (some configuration)});
+```
   
 ## API - confirm task condition
 ###Query
