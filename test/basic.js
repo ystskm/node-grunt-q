@@ -68,7 +68,7 @@ module.exports = nodeunit.testCase({
   'error-task': function(t) {
 
     var q = GQ(), pkgj = './task-teste.json';
-    var p = {}, task_ids = [];
+    var p = {}, task_ids = [], e = 1;
     _setConcatTaskp(p, 1), _setUglifyTaskp(p);
 
     var pkgc = JSON.parse(fs.readFileSync(pkgj).toString());
@@ -79,11 +79,20 @@ module.exports = nodeunit.testCase({
         t.equal(pkgc.taskList.shift(), name);
       })(args[0]);
     }).on('error', function(){
+      e--;
       q.taskProgress(task_ids[0], function(err, data){
         t.equal(data.state, 'error');
         t.ok(data.progress instanceof Error);
-        t.done();
       });
+      if(e === 0)
+        setTimeout(function(){
+          q.taskProgress(task_ids[0], function(err, data){
+            t.equal(e, 0);
+            t.equal(data.state, 'error');
+            t.ok(data.progress instanceof Error);
+            t.done();
+          });
+        }, 5000);
     }));
 
     q.enqueue(pkgj, p, {
