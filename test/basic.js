@@ -64,6 +64,36 @@ module.exports = nodeunit.testCase({
       });
     });
 
+  },
+  'error-task': function(t) {
+
+    var q = GQ(), pkgj = './task-teste.json';
+    var p = {}, task_ids = [];
+    _setConcatTaskp(p, 1), _setUglifyTaskp(p);
+
+    var pkgc = JSON.parse(fs.readFileSync(pkgj).toString());
+    _bindLogging(q.on('ready', function() {
+      chkReady(q, t);
+    }).on('data', function(type, args) {
+      type == 'finish' && (function(name) {
+        t.equal(pkgc.taskList.shift(), name);
+      })(args[0]);
+    }).on('error', function(){
+      q.taskProgress(task_ids[0], function(err, data){
+        t.equal(data.state, 'error');
+        t.ok(data.progress instanceof Error);
+        t.done();
+      });
+    }));
+
+    q.enqueue(pkgj, p, {
+      workdir: __dirname,
+      timeout: 10 * 1000
+    }).on('end', function(_id, task) {
+      t.equal(_id.length, 32), t.equal(task._id, _id);
+      task_ids.push(_id);
+    });
+
   }
 });
 

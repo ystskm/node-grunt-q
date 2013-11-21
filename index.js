@@ -107,29 +107,55 @@ function create(options) {
         if(typeof callback == 'function') // callback pattern
           return delete worker.callback[msg._cid], callback(msg);
 
-        if(msg.type == 'error')
-          return self.emit('error', msg.args[0], msg.args[1]);
+        if(msg.type == 'error' && !msg.args[1]) {// uncaughtException
+          moveAllToErrorState(new Error(msg.args[0]), worker);
+          self.emit('error', msg.args[0]);
+          return;
+        }
+
+        if(msg.type == 'error') {
+          moveToFinishQ(new Error(msg.args[0]), worker, msg.args[1]);
+          self.emit('error', msg.args[0], msg.args[1]);
+          return;
+        }
 
         if(msg.type == 'end') {
-
-          var task_id = msg.args[0];
-          clearTimeout(worker.working[task_id]);
-
-          var task = Task.getById(task_id);
-          if(task) {
-            self._q[task.rank()].dequeue(task);
-            task.state('finished'), self._fq[task_id] = task;
-          }
-
-          // TODO !task
+          moveToFinishQ('finished', worker, msg.args[0]);
           self.emit('_progress', msg.args[0], msg.args[1]), _nextTask(self);
           return;
-
         }
 
         return self.emit('data', msg.type, msg.args);
 
       });
+
+      // all task condition change
+      // when task kills a worker via "grunt.fail.fatal"
+      // or uncaughtException
+      worker.on('exit', onWorkerExit);
+
+      function onWorkerExit(code) {
+        if(typeof code == 'number' && ~[0, 143].indexOf(code))
+          return; // it's normal
+        moveAllToErrorState(new Error('Uncatchable process exit.'), this);
+      }
+
+      function moveAllToErrorState(e, worker) {
+        // if a worker come here, the worker will be killed.
+        Object.keys(worker.working || {}).forEach(function(task_id) {
+          moveToFinishQ(e, worker, task_id);
+        }), worker.kill();
+      }
+
+      function moveToFinishQ(state, worker, task_id) {
+        clearTimeout(worker.working[task_id]), (function(task) {
+          if(!task)
+            return;
+          // TODO !task
+          self._q[task.rank()].dequeue(task), task.state(state);
+          self._fq[task_id] = task, delete worker.working[task_id];
+        })(Task.getById(task_id));
+      }
 
     });
 
@@ -237,6 +263,8 @@ function taskProgress(task_id, callback) {
     if(!task)
       return end('not-in-queue');
     state = task.state();
+    if(typeof state != 'string')
+      return end('error', state);
     if(state == 'pending')
       return end('pending', 0);
     if(state == 'finished')
@@ -288,6 +316,9 @@ function dequeue(task_id) {
     if(task == null)
       throw new Error('The task is not found. Task#' + task_id);
 
+    if(typeof task.state() != 'string') // error state
+      return task.destroy(), delete self._fq[task_id];
+
     if(task.state() === 'pending')
       return task.destroy(), self._q[task.rank()].dequeue(task);
 
@@ -331,7 +362,10 @@ function _seekAvailWorker(self, task) {
     if(worker.max_working > Object.keys(worker.working).length) {
       // set timer
       worker.working[task._id] = setTimeout(function() {
-        self.emit('timeout', task), self.dequeue(task._id);
+        self.emit('timeout', task), worker.emit('message', {
+          type: 'error',
+          args: ['Timeout time expired.', task._id, task]
+        });
       }, task.timeout());
       // set begin time and state
       task.timer(new Date()), task.state('processing');
