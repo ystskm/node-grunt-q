@@ -118,13 +118,28 @@ q.enqueue({
 });
 ```
   
-## API - confirm task condition
+## API - confirm task state
 ###Query
 ```js
 q.confirm(task_id[,raw]);
 ```
 The return value value is `'pending'`, `'processing'` or `'finished'`.
 If you set `true` to the **raw**, you can get Task object and use the functions. (e.g. `.status()`, `.rank()` )  
+  
+## API - confirm task progress
+```js
+q.progress(task_id[,callback]);
+```
+Check the progress of *task_id*.  
+The return value is an object `{ state: (task state), progress: (task progress) }  
+task state:= `not-in-queue` | `error` | `pending` | `processing` | `finished` | `memory trash`  
+task progress:=  
+  case `not-in-queue` value = `undefined`  
+  case `error`        value = Object `Error`  
+  case `pending`      value = `0`  
+  case `processing`   value = { finished: Array `finished task names`, taskList: Array `task names` }  
+  case `finished`     value = `100`  
+  case `memory-trash` value = `undefined` This case occurs when lost worker. Rare case but no way to save the task, now.  
   
 ## API - dequeue and remove task
 ###Query

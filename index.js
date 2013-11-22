@@ -25,7 +25,7 @@ var QProtos = {
   create: create,
   enqueue: enqueue,
   confirm: confirm,
-  taskProgress: taskProgress,
+  progress: progress,
   dequeue: dequeue,
   destroy: destroy
 };
@@ -254,7 +254,7 @@ function confirm(task_id, raw) {
   return task && (raw ? task: task.state());
 }
 
-function taskProgress(task_id, callback) {
+function progress(task_id, callback) {
 
   var self = this, line = [], ee = null;
   var task = _seekTaskById(this, task_id), state = null, worker = null;

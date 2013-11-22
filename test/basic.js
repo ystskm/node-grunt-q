@@ -80,13 +80,13 @@ module.exports = nodeunit.testCase({
       })(args[0]);
     }).on('error', function(){
       e--;
-      q.taskProgress(task_ids[0], function(err, data){
+      q.progress(task_ids[0], function(err, data){
         t.equal(data.state, 'error');
         t.ok(data.progress instanceof Error);
       });
       if(e === 0)
         setTimeout(function(){
-          q.taskProgress(task_ids[0], function(err, data){
+          q.progress(task_ids[0], function(err, data){
             t.equal(e, 0);
             t.equal(data.state, 'error');
             t.ok(data.progress instanceof Error);
