@@ -141,6 +141,15 @@ task progress:=
   case `finished`     value = `100`  
   case `memory-trash` value = `undefined` This case occurs when lost worker. Rare case but no way to save the task, now.  
   
+You can get data eventDrive/callback  
+```
+q.progress(task_id).on('error', function(err){ ... }).on('end', function(status_value){ ... });
+```
+,or  
+```
+q.progress(task_id, function(err, status_value){ ... });
+```
+  
 ## API - dequeue and remove task
 ###Query
 ```js
