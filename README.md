@@ -134,12 +134,13 @@ Check the progress of *task_id*.
 The return value is an object `{ state: (task state), progress: (task progress) }`  
 task state:= `not-in-queue` | `error` | `pending` | `processing` | `finished` | `memory trash`  
 task progress:=  
-  case `not-in-queue` value = `undefined`  
-  case `error`        value = Object `Error`  
-  case `pending`      value = `0`  
-  case `processing`   value = { finished: Array `finished task names`, taskList: Array `task names` }  
-  case `finished`     value = `100`  
-  case `memory-trash` value = `undefined` This case occurs when lost worker. Rare case but no way to save the task, now.  
+  - `not-in-queue` value = `undefined`  
+  - `error`        value = Object `Error`  
+  - `pending`      value = `0`  
+  - `processing`   value = { finished: Array `finished task names`, taskList: Array `task names` }  
+  - `finished`     value = `100`  
+  - `memory-trash` value = `undefined`  
+  This case occurs when lost worker. Rare case but no way to save the task, now.  
   
 You can get data eventDrive/callback  
 ```
