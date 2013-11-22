@@ -137,7 +137,7 @@ task progress:=
   - `not-in-queue` value = `undefined`  
   - `error`        value = `Error`  
   - `pending`      value = `0`  
-  - `processing`   value = { finished: `Array` finished task names, taskList: `Array` task names }  
+  - `processing`   value = { finished: `Array` _finished task names_, taskList: `Array` _task names_ }  
   - `finished`     value = `100`  
   - `memory-trash` value = `undefined`  
   This case occurs when lost worker. Rare case but no way to save the task, now.  
