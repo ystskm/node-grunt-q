@@ -131,7 +131,7 @@ If you set `true` to the **raw**, you can get Task object and use the functions.
 q.progress(task_id[,callback]);
 ```
 Check the progress of *task_id*.  
-The return value is an object `{ state: (task state), progress: (task progress) }  
+The return value is an object `{ state: (task state), progress: (task progress) }`  
 task state:= `not-in-queue` | `error` | `pending` | `processing` | `finished` | `memory trash`  
 task progress:=  
   case `not-in-queue` value = `undefined`  
