@@ -135,9 +135,9 @@ The return value is an object `{ state: (task state), progress: (task progress) 
 task state:= `not-in-queue` | `error` | `pending` | `processing` | `finished` | `memory trash`  
 task progress:=  
   - `not-in-queue` value = `undefined`  
-  - `error`        value = Object `Error`  
+  - `error`        value = `Error`  
   - `pending`      value = `0`  
-  - `processing`   value = { finished: Array `finished task names`, taskList: Array `task names` }  
+  - `processing`   value = { finished: `Array` finished task names, taskList: `Array` task names }  
   - `finished`     value = `100`  
   - `memory-trash` value = `undefined`  
   This case occurs when lost worker. Rare case but no way to save the task, now.  
