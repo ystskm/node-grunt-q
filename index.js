@@ -89,7 +89,6 @@ function create(options) {
   self._wg = WorkerGroup(Math.min(numCPUs, opts.maxWorker), onlineCallback);
 
   function onlineCallback(err, workers) {
-
     workers.forEach(function(worker, i) {
 
       if(worker.working) // if already set
@@ -102,31 +101,7 @@ function create(options) {
 
       // catch worker message
       worker.on('message', function(msg) {
-
-        var worker = this, callback = worker.callback[msg._cid];
-        if(typeof callback == 'function') // callback pattern
-          return delete worker.callback[msg._cid], callback(msg);
-
-        if(msg.type == 'error' && !msg.args[1]) {// uncaughtException
-          moveAllToErrorState(new Error(msg.args[0]), worker);
-          self.emit('error', msg.args[0]);
-          return;
-        }
-
-        if(msg.type == 'error') {
-          moveToFinishQ(new Error(msg.args[0]), worker, msg.args[1]);
-          self.emit('error', msg.args[0], msg.args[1]);
-          return;
-        }
-
-        if(msg.type == 'end') {
-          moveToFinishQ('finished', worker, msg.args[0]);
-          self.emit('_progress', msg.args[0], msg.args[1]), _nextTask(self);
-          return;
-        }
-
-        return self.emit('data', msg.type, msg.args);
-
+        setImmediate(onWorkerMessagePlay(this, msg)); // it's very important to reset socket buffer.
       });
 
       // all task condition change
@@ -134,34 +109,64 @@ function create(options) {
       // or uncaughtException
       worker.on('exit', onWorkerExit);
 
-      function onWorkerExit(code) {
-        if(typeof code == 'number' && ~[0, 143].indexOf(code))
-          return; // it's normal
-        moveAllToErrorState(new Error('Uncatchable process exit.'), this);
-      }
-
-      function moveAllToErrorState(e, worker) {
-        // if a worker come here, the worker will be killed.
-        Object.keys(worker.working || {}).forEach(function(task_id) {
-          moveToFinishQ(e, worker, task_id);
-        }), worker.kill();
-      }
-
-      function moveToFinishQ(state, worker, task_id) {
-        clearTimeout(worker.working[task_id]), (function(task) {
-          if(!task)
-            return;
-          // TODO !task
-          self._q[task.rank()].dequeue(task), task.state(state);
-          self._fq[task_id] = task, delete worker.working[task_id];
-        })(Task.getById(task_id));
-      }
-
     });
 
     self._workers = workers;
     Array.isArray(self._ready) && self.emit('_ready');
+  }
 
+  function onWorkerExit(code) {
+    if(typeof code == 'number' && ~[0, 143].indexOf(code))
+      return; // It's normal
+    moveAllToErrorState(new Error('Uncatchable process exit.'), this);
+  }
+
+  function moveAllToErrorState(e, worker) {
+    // if a worker come here, the worker will be killed.
+    Object.keys(worker.working || {}).forEach(function(task_id) {
+      moveToFinishQ(e, worker, task_id);
+    }), worker.kill();
+  }
+
+  function moveToFinishQ(state, worker, task_id) {
+    clearTimeout(worker.working[task_id]), (function(task) {
+      if(!task)
+        return;
+      // TODO !task
+      self._q[task.rank()].dequeue(task), task.state(state);
+      self._fq[task_id] = task, delete worker.working[task_id];
+    })(Task.getById(task_id));
+  }
+
+  function onWorkerMessagePlay() {
+    return function(worker, msg) {
+
+      var callback = worker.callback[msg.type];
+
+      if(typeof callback == 'function') // callback pattern
+        return delete worker.callback[msg.type], callback(msg.data);
+
+      if(msg.type == 'error' && msg.args[1] == null) { // uncaughtException
+        moveAllToErrorState(new Error(msg.args[0]), worker);
+        self.emit('error', msg.args[0]);
+        return;
+      }
+
+      if(msg.type == 'error') {
+        moveToFinishQ(new Error(msg.args[0]), worker, msg.args[1]);
+        self.emit('error', msg.args[0], msg.args[1]);
+        return;
+      }
+
+      if(msg.type == 'end') {
+        moveToFinishQ('finished', worker, msg.args[0]);
+        self.emit('_progress', msg.args[0], msg.args[1]), _nextTask(self);
+        return;
+      }
+
+      return self.emit('data', msg.type, msg.args);
+
+    }.bind(this, arguments[0], arguments[1]);
   }
 
 }
@@ -283,8 +288,8 @@ function progress(task_id, callback) {
 
   line.push(_.caught(function() {
     var _cid = Task.idGen();
-    worker.callback[_cid] = function(msg) {
-      end(state, msg.data);
+    worker.callback[_cid] = function(data) {
+      end(state, data);
     };
     worker.send({
       cmd: 'taskProgress',
@@ -364,7 +369,7 @@ function _seekAvailWorker(self, task) {
       worker.working[task._id] = setTimeout(function() {
         self.emit('timeout', task), worker.emit('message', {
           type: 'error',
-          args: ['Timeout time expired.', task._id, task]
+          args: ['Timeout limit expired.', task._id, task],
         });
       }, task.timeout());
       // set begin time and state
