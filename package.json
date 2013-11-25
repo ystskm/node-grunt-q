@@ -1,6 +1,6 @@
 {
   "name": "grunt-q",
-  "version": "0.3.0",
+  "version": "0.4.1",
   "author": {
     "name": "Yoshitaka Sakamoto",
     "url": "http://github.com/ystskm",
@@ -9,7 +9,7 @@
   "contributors": [],
   "description": "Support for queueing grunt task with using cluster.",
   "dependencies": {
-    "grunt-runner":">=1.0.4"
+    "grunt-runner":">=1.1.2"
   },
   "devDependencies": {
     "nodeunit": "*",

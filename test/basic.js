@@ -1,6 +1,7 @@
 var nodeunit = require('nodeunit'), fs = require('fs');
 var GQ = require('../index');
 
+var data_types = new Array();
 module.exports = nodeunit.testCase({
   'one-task': function(t) {
 
@@ -11,8 +12,8 @@ module.exports = nodeunit.testCase({
     var pkgc = JSON.parse(fs.readFileSync(pkgj).toString());
     _bindLogging(q.on('ready', function() {
       chkReady(q, t);
-    }).on('data', function(type, args) {
-      type == 'finish' && (function(name) {
+    }).on('data', function(task_id, type, args) {
+      data_types.push(type), type == 'finish' && (function(name) {
         t.equal(pkgc.taskList.shift(), name);
       })(args[0]);
     }).on('progress', function(task_id) {
@@ -40,9 +41,9 @@ module.exports = nodeunit.testCase({
 
     _bindLogging(q.on('ready', function() {
       chkReady(q, t);
-    }).on('data', function(type, args) {
+    }).on('data', function(task_id, type, args) {
       var pkgc = (pkgcs[0].taskList.length == 0 ? pkgcs.shift(): pkgcs[0]);
-      type == 'finish' && (function(name) {
+      data_types.push(type), type == 'finish' && (function(name) {
         var pkgc = pkgcs[pkgcs[0].taskList[0] == name ? 0: 1];
         t.equal(pkgc.taskList.shift(), name);
       })(args[0]);
@@ -74,24 +75,25 @@ module.exports = nodeunit.testCase({
     var pkgc = JSON.parse(fs.readFileSync(pkgj).toString());
     _bindLogging(q.on('ready', function() {
       chkReady(q, t);
-    }).on('data', function(type, args) {
-      type == 'finish' && (function(name) {
+    }).on('data', function(task_id, type, args) {
+      data_types.push(type), type == 'finish' && (function(name) {
         t.equal(pkgc.taskList.shift(), name);
       })(args[0]);
-    }).on('error', function(){
+    }).on('error', function() {
       e--;
-      q.progress(task_ids[0], function(err, data){
+      q.progress(task_ids[0], function(err, data) {
         t.equal(data.state, 'error');
         t.ok(data.progress instanceof Error);
       });
       if(e === 0)
-        setTimeout(function(){
-          q.progress(task_ids[0], function(err, data){
+        setTimeout(function() {
+          q.progress(task_ids[0], function(err, data) {
             t.equal(e, 0);
             t.equal(data.state, 'error');
             t.ok(data.progress instanceof Error);
             q.destroy(), t.ok(true, 'error-task: going to done.');
-            t.done();
+            // 2(start, finish) * 7 (complete-task-num) + 1 * 1 (error-task-num)
+            t.equals(data_types.length, 2 * 7 + 1), t.done();
           });
         }, 5000);
     }));

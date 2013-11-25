@@ -146,25 +146,25 @@ function create(options) {
       if(typeof callback == 'function') // callback pattern
         return delete worker.callback[msg.type], callback(msg.data);
 
-      if(msg.type == 'error' && msg.args[1] == null) { // uncaughtException
-        moveAllToErrorState(new Error(msg.args[0]), worker);
-        self.emit('error', msg.args[0]);
+      if(msg.type == 'error' && msg.t_id == null) { // uncaughtException
+        moveAllToErrorState(new Error(msg.data[0]), worker);
+        self.emit('error', msg.data[0]);
         return;
       }
 
       if(msg.type == 'error') {
-        moveToFinishQ(new Error(msg.args[0]), worker, msg.args[1]);
-        self.emit('error', msg.args[0], msg.args[1]);
+        moveToFinishQ(new Error(msg.data[0]), worker, msg.t_id);
+        self.emit('error', msg.data[0], msg.t_id);
         return;
       }
 
       if(msg.type == 'end') {
-        moveToFinishQ('finished', worker, msg.args[0]);
-        self.emit('_progress', msg.args[0], msg.args[1]), _nextTask(self);
+        moveToFinishQ('finished', worker, msg.t_id);
+        self.emit('_progress', msg.t_id, msg.data), _nextTask(self);
         return;
       }
 
-      return self.emit('data', msg.type, msg.args);
+      return self.emit('data', msg.t_id, msg.type, msg.data);
 
     }.bind(this, arguments[0], arguments[1]);
   }
