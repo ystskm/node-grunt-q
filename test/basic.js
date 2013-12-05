@@ -13,7 +13,8 @@ module.exports = nodeunit.testCase({
     _bindLogging(q.on('ready', function() {
       chkReady(q, t);
     }).on('data', function(task_id, type, args) {
-      data_types.push(type), type == 'finish' && (function(name) {
+      data_types.push('[' + args[0] + '] ' + type);
+      type == 'finish' && (function(name) {
         t.equal(pkgc.taskList.shift(), name);
       })(args[0]);
     }).on('progress', function(task_id) {
@@ -43,7 +44,8 @@ module.exports = nodeunit.testCase({
       chkReady(q, t);
     }).on('data', function(task_id, type, args) {
       var pkgc = (pkgcs[0].taskList.length == 0 ? pkgcs.shift(): pkgcs[0]);
-      data_types.push(type), type == 'finish' && (function(name) {
+      data_types.push('[' + args[0] + '] ' + type);
+      type == 'finish' && (function(name) {
         var pkgc = pkgcs[pkgcs[0].taskList[0] == name ? 0: 1];
         t.equal(pkgc.taskList.shift(), name);
       })(args[0]);
@@ -76,7 +78,8 @@ module.exports = nodeunit.testCase({
     _bindLogging(q.on('ready', function() {
       chkReady(q, t);
     }).on('data', function(task_id, type, args) {
-      data_types.push(type), type == 'finish' && (function(name) {
+      data_types.push('[' + args[0] + '] ' + type);
+      type == 'finish' && (function(name) {
         t.equal(pkgc.taskList.shift(), name);
       })(args[0]);
     }).on('error', function() {
@@ -92,7 +95,8 @@ module.exports = nodeunit.testCase({
             t.equal(data.state, 'error');
             t.ok(data.progress instanceof Error);
             q.destroy(), t.ok(true, 'error-task: going to done.');
-            // 2(start, finish) * 7 (complete-task-num) + 1 * 1 (error-task-num)
+            // 2(start, finish) * 8 (complete-task-num) + 1 * 1 (error-task-num)
+            console.log(data_types); // for debug.
             t.equals(data_types.length, 2 * 7 + 1), t.done();
           });
         }, 5000);
