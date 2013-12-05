@@ -115,10 +115,15 @@ function create(options) {
     Array.isArray(self._ready) && self.emit('_ready');
   }
 
-  function onWorkerExit(code) {
+  function onWorkerExit() {
+
+    var code = arguments[0];
     if(typeof code == 'number' && ~[0, 143].indexOf(code))
       return; // It's normal
-    moveAllToErrorState(new Error('Uncatchable process exit.'), this);
+
+    var m = 'Uncatchable process exit. (' + code + ')';
+    moveAllToErrorState(new Error(m), this);
+
   }
 
   function moveAllToErrorState(e, worker) {
@@ -342,7 +347,7 @@ function destroy() {
     task.destroy();
   });
 
-  this._wg.close();
+  this._wg && this._wg.close();
   _init(this);
 
 }
