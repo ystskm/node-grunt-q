@@ -255,7 +255,8 @@ function enqueue(pkg, commands, opts, callback, _emitter_) {
 
   };
 
-  return ee = eventDrive(_emitter_, fn, callback);
+  var args = _emitter_ ? [_emitter_, fn, callback]: [fn, callback];
+  return ee = eventDrive.apply(null, args);
 
 }
 
