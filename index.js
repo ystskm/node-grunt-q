@@ -147,29 +147,30 @@ function create(options) {
     return function(worker, msg) {
 
       var callback = worker.callback[msg.type];
+      var data = msg.data || '';
 
       if(typeof callback == 'function') // callback pattern
-        return delete worker.callback[msg.type], callback(msg.data);
+        return delete worker.callback[msg.type], callback(data);
 
       if(msg.type == 'error' && msg.t_id == null) { // uncaughtException
-        moveAllToErrorState(new Error(msg.data[0]), worker);
-        self.emit('error', msg.data[0]);
+        moveAllToErrorState(new Error(data[0] || 'uncaughtException'), worker);
+        self.emit('error', data[0]);
         return;
       }
 
       if(msg.type == 'error') {
-        moveToFinishQ(new Error(msg.data[0]), worker, msg.t_id);
-        self.emit('error', msg.data[0], msg.t_id);
+        moveToFinishQ(new Error(data[0] || 'error'), worker, msg.t_id);
+        self.emit('error', data[0], msg.t_id);
         return;
       }
 
       if(msg.type == 'end') {
         moveToFinishQ('finished', worker, msg.t_id);
-        self.emit('_progress', msg.t_id, msg.data), _nextTask(self);
+        self.emit('_progress', msg.t_id, data), _nextTask(self);
         return;
       }
 
-      return self.emit('data', msg.t_id, msg.type, msg.data);
+      return self.emit('data', msg.t_id, msg.type, data);
 
     }.bind(this, arguments[0], arguments[1]);
   }
