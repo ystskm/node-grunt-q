@@ -1,5 +1,7 @@
 /***/
 // [node-grunt-q] index.js
+var NULL = null, TRUE = true, FALSE = false;
+var g = global;
 var Emitter = require('events').EventEmitter, inherits = require('util').inherits;
 var SimpleQ = require('./lib/SimpleQ'), Task = require('./lib/Task'), WorkerGroup = require('./lib/WorkerGroup');
 
@@ -10,41 +12,44 @@ gruntQ._ = _, gruntQ.SimpleQ = SimpleQ, gruntQ.Task = Task;
 
 function gruntQ(options) {
 
-  if(!(this instanceof gruntQ))
+  var GQ = this;
+  if(!(this instanceof gruntQ)) {
     return new gruntQ(options);
+  }
 
-  Emitter.call(this);
+  Emitter.call(GQ);
 
   // queue and finished task map
-  _init(this), this.create(options);
+  _init(GQ), GQ.create(options);
 
 }
 inherits(gruntQ, Emitter);
 
-var QProtos = {
+each({
   create: create,
   enqueue: enqueue,
   confirm: confirm,
   progress: progress,
   dequeue: dequeue,
   destroy: destroy
-};
-for( var i in QProtos)
-  gruntQ.prototype[i] = QProtos[i];
+}, function(k, func) {
+  gruntQ.prototype[k] = func;
+});
 
 function create(options) {
 
-  var self = this, Q = self._q;
+  var GQ = this, Q = GQ._q;
 
   // fix argument
-  if(Array.isArray(options))
+  if(isArray(options)) {
     options = {
       q: options
     };
-  else if(typeof options == 'number')
+  } else if(is('number', options)) {
     options = {
       q: new Array(options)
     };
+  }
 
   // mix-in default
   var numCPUs = require('os').cpus().length, opts = _.extend({
@@ -54,41 +59,52 @@ function create(options) {
   }, options || {});
 
   // fix queue state
-  if(!Array.isArray(opts.q))
+  if(!isArray(opts.q)) {
     opts.q = [opts.q];
+  }
   opts.q = opts.q.map(function(v, i) {
-    if(v)
-      return typeof v.rank != 'number' && (v.rank = i), v;
+    if(v) {
+      if(!is('number', v.rank)) v.rank = i;
+      return v;
+    }
     return {
       rank: i
     };
   });
 
   opts.q.forEach(function(v) {
-    if(Q[v.rank])
+    if(Q[v.rank]) {
       throw new Error('Duplicated rank call: rank=' + v.rank);
+    }
     Q[v.rank] = new SimpleQ(v.maxQueue);
   });
 
-  self.once('_ready', function() {
-    // execute waiting enqueue tasks
-    var waitQueue = self._ready;
-    self._ready = true, waitQueue.forEach(function(fn) {
+  GQ.once('_ready', function() {
+    
+    // Execute waiting enqueue tasks
+    var waitQueue = GQ._ready;
+    GQ._ready = TRUE, waitQueue.forEach(function(fn) {
       _.processor(fn);
     });
+    
     // then, emit ready event
     _.processor(function() {
-      self.emit('ready');
+      GQ.emit('ready');
     });
+    
   });
 
-  self.on('_progress', function(task_id, task) {
-    self.emit('progress', task_id, task);
+  GQ.on('_progress', function(task_id, task) {
+    GQ.emit('progress', task_id, task);
   });
 
-  self._wg = WorkerGroup(Math.min(numCPUs, opts.maxWorker), onlineCallback);
+  if(require('cluster').isMaster) {
+    GQ._wg = WorkerGroup(Math.min(numCPUs, opts.maxWorker), onlineCallback);
+  } else {
+    onlineCallback(NULL, workers = [process]);
+  }
 
-  function onlineCallback(err, workers) {
+  function onlineCallback(er, workers) {
     workers.forEach(function(worker, i) {
 
       if(worker.working) // if already set
@@ -110,16 +126,16 @@ function create(options) {
       worker.on('exit', onWorkerExit);
 
     });
-
-    self._workers = workers;
-    Array.isArray(self._ready) && self.emit('_ready');
+    GQ._workers = workers;
+    if(isArray(GQ._ready)) GQ.emit('_ready');
   }
 
   function onWorkerExit() {
 
     var code = arguments[0];
-    if(typeof code == 'number' && ~[0, 143].indexOf(code))
+    if(is('number', code) && [0, 143].indexOf(code) == -1) {
       return; // It's normal
+    }
 
     var m = 'Uncatchable process exit. (' + code + ')';
     moveAllToErrorState(new Error(m), this);
@@ -127,19 +143,26 @@ function create(options) {
   }
 
   function moveAllToErrorState(e, worker) {
-    // if a worker come here, the worker will be killed.
+    // If a worker come here, the worker will be killed.
     Object.keys(worker.working || {}).forEach(function(task_id) {
       moveToFinishQ(e, worker, task_id);
-    }), worker.kill();
+    });
+    if(process !== worker) {
+      worker.kill();
+    }
   }
 
   function moveToFinishQ(state, worker, task_id) {
     clearTimeout(worker.working[task_id]), (function(task) {
-      if(!task)
+      
+      if(!task) {
         return;
+      }
+      
       // TODO !task
-      self._q[task.rank()].dequeue(task), task.state(state);
-      self._fq[task_id] = task, delete worker.working[task_id];
+      GQ._q[task.rank()].dequeue(task), task.state(state);
+      GQ._fq[task_id] = task, delete worker.working[task_id];
+      
     })(Task.getById(task_id));
   }
 
@@ -149,43 +172,48 @@ function create(options) {
       var callback = worker.callback[msg.type];
       var data = msg.data || '';
 
-      if(typeof callback == 'function') // callback pattern
+      if(isFunction(callback)) { // callback pattern
         return delete worker.callback[msg.type], callback(data);
+      }
 
-      if(msg.type == 'error' && msg.t_id == null) { // uncaughtException
+      if(msg.type == 'error' && msg.t_id == NULL) { // uncaughtException
         moveAllToErrorState(new Error(data[0] || 'uncaughtException'), worker);
-        self.emit('error', data[0]);
+        GQ.emit('error', data[0]);
         return;
       }
 
       if(msg.type == 'error') {
         moveToFinishQ(new Error(data[0] || 'error'), worker, msg.t_id);
-        self.emit('error', data[0], msg.t_id);
+        GQ.emit('error', data[0], msg.t_id);
         return;
       }
 
       if(msg.type == 'end') {
         moveToFinishQ('finished', worker, msg.t_id);
-        self.emit('_progress', msg.t_id, data), _nextTask(self);
+        GQ.emit('_progress', msg.t_id, data);
+        _nextTask(GQ);
         return;
       }
 
-      return self.emit('data', msg.t_id, msg.type, data);
+      return GQ.emit('data', msg.t_id, msg.type, data);
 
     }.bind(this, arguments[0], arguments[1]);
   }
 
 }
 
-function _nextTask(self) {
+function _nextTask(GQ) {
 
-  var task = _seekNextTask(self);
-  if(task == null)
-    return self.emit('empty');
+  var task = _seekNextTask(GQ);
+  if(task == NULL) {
+    return GQ.emit('empty');
+  }
 
-  var worker = _seekAvailWorker(self, task);
-  if(worker == null)
-    return self.emit('busy');
+  var worker = _seekAvailWorker(GQ, task);
+  if(worker == NULL) {
+    return GQ.emit('busy');
+  }
+  
   worker.send({
     task_id: task._id,
     task: task.read()
@@ -195,38 +223,41 @@ function _nextTask(self) {
 
 function enqueue(pkg, commands, opts, callback, _emitter_) {
 
-  var self = this, ee = _emitter_;
+  var GQ = this, ee = _emitter_;
 
   // before queue ready
-  if(Array.isArray(self._ready)) {
-    ee = new Emitter(), self._ready.push(function() {
-      self.enqueue(pkg, commands, opts, callback, ee);
+  if(isArray(GQ._ready)) {
+    ee = new Emitter(), GQ._ready.push(function() {
+      GQ.enqueue(pkg, commands, opts, callback, ee);
     });
     return ee;
   }
 
   // [pkg], commands [,opts][,callback]
-  if(typeof pkg != 'string') // package name is not specified
+  if(!is('string', pkg)) { // package name is not specified
     callback = opts, opts = commands, commands = pkg, pkg = 'package.json'
-
-    // argument.length == 2
-  if(typeof opts == 'function')
+  }
+  
+  // argument.length == 2
+  if(isFunction(opts)) {
     callback = opts, opts = {};
+  }
 
-  if(!opts)
+  if(!opts) {
     opts = {};
-  else if(typeof opts == 'number')
+  } else if(is('number', opts)) {
     opts = {
       rank: [opts, opts]
     };
-  else if(Array.isArray(opts))
+  } else if(isArray(opts)) {
     opts = {
       rank: opts
     };
+  }
 
-  opts = _.extend({
+  opts = extend({
     workdir: process.cwd(),
-    rank: [0, self._q.length - 1],
+    rank: [0, GQ._q.length - 1],
     timeout: 60 * 1000
   }, opts);
 
@@ -235,47 +266,52 @@ function enqueue(pkg, commands, opts, callback, _emitter_) {
     if(opts.rank[0] > opts.rank[1])
       opts.rank = [opts[1], opts[0]];
 
-    var ok = false, ra = opts.rank[1], task = null;
-    while(ok === false && ra >= 0) {
-      var _q = self._q[ra];
+    var ok = FALSE, ra = opts.rank[1], task = NULL, _q = NULL;
+    while(ok === FALSE && ra >= 0) {
+      
+      _q = GQ._q[ra];
       if(!_q) {
         ra--;
         continue;
       }
       task = new Task(pkg, commands, ra, opts.timeout, opts.workdir);
+      
       if(_q.push(task)) {
-        ok = true;
+        ok = TRUE;
         break;
       }
       task.destroy(), ra--;
+      
     }
 
-    if(ok === false)
+    if(ok === FALSE) {
       return ee.emit('error', new Error('Failed to enqueueing.'), task);
-    return ee.emit('end', task._id, task), _nextTask(self);
+    }
+    return ee.emit('end', task._id, task), _nextTask(GQ);
 
   };
 
   var args = _emitter_ ? [_emitter_, fn, callback]: [fn, callback];
-  return ee = eventDrive.apply(null, args);
+  return ee = eventDrive.apply(NULL, args);
 
 }
 
 function confirm(task_id, raw) {
-  var task = _seekTaskById(this, task_id);
+  var GQ = this;
+  var task = _seekTaskById(GQ, task_id);
   return task && (raw ? task: task.state());
 }
 
 function progress(task_id, callback) {
 
-  var self = this, line = [], ee = null;
-  var task = _seekTaskById(this, task_id), state = null, worker = null;
+  var GQ = this, line = [], ee = NULL;
+  var task = _seekTaskById(GQ, task_id), state = NULL, worker = NULL;
 
   line.push(_.caught(function(next) {
     if(!task)
       return end('not-in-queue');
     state = task.state();
-    if(typeof state != 'string')
+    if(!is('string', state))
       return end('error', state);
     if(state == 'pending')
       return end('pending', 0);
@@ -285,11 +321,12 @@ function progress(task_id, callback) {
   }, error));
 
   line.push(_.caught(function(next) {
-    _forEachWorker(self, function(targ) {
+    _forEachWorker(GQ, function(targ) {
       targ.working[task_id] && (worker = targ);
     });
-    if(!worker)
+    if(!worker) {
       return end('memory-trash');
+    }
     next();
   }, error));
 
@@ -320,22 +357,25 @@ function progress(task_id, callback) {
 }
 
 function dequeue(task_id) {
-
-  var self = this;
+  var GQ = this;
   [].concat(task_id).forEach(function(task_id) {
 
-    var task = _seekTaskById(self, task_id);
-    if(task == null)
+    var task = _seekTaskById(GQ, task_id);
+    if(task == NULL) {
       throw new Error('The task is not found. Task#' + task_id);
+    }
 
-    if(typeof task.state() != 'string') // error state
-      return task.destroy(), delete self._fq[task_id];
+    if(!is('string', task.state())) { // error state
+      return task.destroy(), delete GQ._fq[task_id];
+    }
 
-    if(task.state() === 'pending')
-      return task.destroy(), self._q[task.rank()].dequeue(task);
+    if(task.state() === 'pending') {
+      return task.destroy(), GQ._q[task.rank()].dequeue(task);
+    }
 
-    if(task.state() === 'finished')
-      return task.destroy(), delete self._fq[task_id];
+    if(task.state() === 'finished') {
+      return task.destroy(), delete GQ._fq[task_id];
+    }
 
     // processing, or other
     throw new Error('Unable to dequeue state: ' + task.state());
@@ -344,61 +384,86 @@ function dequeue(task_id) {
 }
 
 function destroy() {
-
+  
+  var GQ = this;
   Task.forEachTask(function(task) {
     task.destroy();
   });
 
-  this._wg && this._wg.close();
-  _init(this);
+  if(GQ._wg) GQ._wg.close();
+  _init(GQ);
 
 }
 
-function _seekNextTask(self) {
-  var ra = self._q.length - 1;
+function _seekNextTask(GQ) {
+  var ra = GQ._q.length - 1;
   while(ra >= 0) {
-    var nextTask = self._q[ra].next(function(task) {
+    var nextTask = GQ._q[ra].next(function(task) {
       return task.state() == 'pending';
     });
-    if(nextTask)
+    if(nextTask) {
       return nextTask;
-    ra--
+    }
+    ra--;
   }
 }
 
-function _seekAvailWorker(self, task) {
-  var len = self._workers.length, idx = self._worker_idx, cnt = len;
-  var worker = null;
+function _seekAvailWorker(GQ, task) {
+  var len = GQ._workers.length, idx = GQ._worker_idx, cnt = len;
+  var worker = NULL;
   while(cnt--) {
-    worker = self._workers[idx == len ? (idx = 0): idx];
+    worker = GQ._workers[idx == len ? (idx = 0): idx];
     if(worker.max_working > Object.keys(worker.working).length) {
-      // set timer
+      
+      // Set timer
       worker.working[task._id] = setTimeout(function() {
-        self.emit('timeout', task), worker.emit('message', {
+        GQ.emit('timeout', task);
+        GQ.emit('message', {
           type: 'error',
           args: ['Timeout limit expired.', task._id, task],
         });
       }, task.timeout());
-      // set begin time and state
+      
+      // Set begin time and state
       task.timer(new Date()), task.state('processing');
       return worker;
+      
     }
-    worker = null, idx++;
+    worker = NULL, idx++;
   }
   return worker;
 }
 
-function _seekTaskById(self, task_id) {
-  if(self._fq[task_id])
-    return self._fq[task_id];
+function _seekTaskById(GQ, task_id) {
+  if(GQ._fq[task_id]) {
+    return GQ._fq[task_id];
+  }
   return Task.getById(task_id);
 }
 
-function _init(self) {
-  self._q = [], self._fq = {}, self._workers = [], self._worker_idx = 0;
-  self._ready = [], delete self._wg;
+function _init(GQ) {
+  GQ._q = [], GQ._fq = {};
+  GQ._workers = [], GQ._worker_idx = 0, GQ._ready = [];
+  delete GQ._wg;
 }
 
-function _forEachWorker(self, fn) {
-  self._workers.forEach(fn);
+function _forEachWorker(GQ, fn) {
+  GQ._workers.forEach(fn);
+}
+
+// --------- //
+function each(obj, func) {
+  for(var k in obj) func(k, obj[k]);
+}
+function extend() {
+  return _.extend.apply(_, arguments);
+}
+function is(ty, x) {
+  return typeof x == ty;
+}
+function isFunction(x) {
+  return is('function', x);
+}
+function isArray(x) { 
+  return Array.isArray(x);
 }
