@@ -97,7 +97,7 @@ module.exports = nodeunit.testCase({
             q.destroy(), t.ok(true, 'error-task: going to done.');
             // 2(start, finish) * 8 (complete-task-num) + 1 * 1 (error-task-num)
             console.log(data_types); // for debug.
-            t.equals(data_types.length, 2 * 7 + 1), t.done();
+            t.equals(data_types.length, 2 * 8 + 1 * 1), t.done();
           });
         }, 5000);
     }));
