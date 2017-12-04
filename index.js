@@ -2,13 +2,29 @@
 // [node-grunt-q] index.js
 var NULL = null, TRUE = true, FALSE = false;
 var g = global;
+var cluster = require('cluster');
 var Emitter = require('events').EventEmitter, inherits = require('util').inherits;
-var SimpleQ = require('./lib/SimpleQ'), Task = require('./lib/Task'), WorkerGroup = require('./lib/WorkerGroup');
+var SimpleQ = require('./lib/SimpleQ'), Task = require('./lib/Task');
+
+var WorkerGroup, eventBinding;
+if(cluster.isMaster) {
+  WorkerGroup = require('./lib/WorkerGroup');
+} else {
+  eventBinding = require('./lib/eventBinding');
+}
 
 // depended utilities
 var gr = require('grunt-runner'), _ = gr._, eventDrive = _.eventDrive;
+gruntQ.__dirname = __dirname;
+gruntQ._ = _;
+gruntQ.SimpleQ = SimpleQ;
+gruntQ.Task = Task;
 module.exports = gruntQ;
-gruntQ._ = _, gruntQ.SimpleQ = SimpleQ, gruntQ.Task = Task;
+
+var Event = {
+  Interact: 'GQ_interact',
+  Message: 'message'
+};
 
 function gruntQ(options) {
 
@@ -19,23 +35,35 @@ function gruntQ(options) {
 
   Emitter.call(GQ);
 
-  // queue and finished task map
-  _init(GQ), GQ.create(options);
+  // Queue and finished task map
+  _init(GQ);
+  GQ.create(options);
 
 }
 inherits(gruntQ, Emitter);
 
 each({
+
   create: create,
   enqueue: enqueue,
   confirm: confirm,
   progress: progress,
   dequeue: dequeue,
-  destroy: destroy
+  destroy: destroy,
+  message: message,
+
+  workerListener: workerListener,
+  workerInteract: workerInteract,
+
 }, function(k, func) {
   gruntQ.prototype[k] = func;
 });
 
+/**
+ * 
+ * @param options
+ * @returns
+ */
 function create(options) {
 
   var GQ = this, Q = GQ._q;
@@ -80,47 +108,56 @@ function create(options) {
   });
 
   GQ.once('_ready', function() {
-    
+
     // Execute waiting enqueue tasks
     var waitQueue = GQ._ready;
     GQ._ready = TRUE, waitQueue.forEach(function(fn) {
       _.processor(fn);
     });
-    
+
     // then, emit ready event
     _.processor(function() {
       GQ.emit('ready');
     });
-    
+
   });
 
   GQ.on('_progress', function(task_id, task) {
     GQ.emit('progress', task_id, task);
   });
 
-  if(require('cluster').isMaster) {
+  if(WorkerGroup) {
     GQ._wg = WorkerGroup(Math.min(numCPUs, opts.maxWorker), onlineCallback);
   } else {
+
+    GQ._notMaster = TRUE;
+    eventBinding(process, function(func) {
+      GQ.workerListener(process, func);
+    }, function(obj) {
+      GQ.workerInteract(process, obj);
+    });
     onlineCallback(NULL, workers = [process]);
+
   }
 
   function onlineCallback(er, workers) {
     workers.forEach(function(worker, i) {
 
-      if(worker.working) // if already set
+      if(worker.working) { // If already set
         return;
+      }
 
-      // set worker status
+      // Set worker status
       var tpw = opts.taskPerWorker;
       worker.working = {}, worker.callback = {};
       worker.max_working = tpw[i] || tpw;
 
-      // catch worker message
-      worker.on('message', function(msg) {
-        setImmediate(onWorkerMessagePlay(this, msg)); // it's very important to reset socket buffer.
+      // Catch worker message
+      GQ.workerListener(worker, function(msg) {
+        setImmediate(onWorkerMessagePlay(worker, msg)); // It's very important to reset socket buffer.
       });
 
-      // all task condition change
+      // All task condition change
       // when task kills a worker via "grunt.fail.fatal"
       // or uncaughtException
       worker.on('exit', onWorkerExit);
@@ -154,40 +191,47 @@ function create(options) {
 
   function moveToFinishQ(state, worker, task_id) {
     clearTimeout(worker.working[task_id]), (function(task) {
-      
+
       if(!task) {
         return;
       }
-      
+
       // TODO !task
       GQ._q[task.rank()].dequeue(task), task.state(state);
       GQ._fq[task_id] = task, delete worker.working[task_id];
-      
+
     })(Task.getById(task_id));
   }
 
-  function onWorkerMessagePlay() {
-    return function(worker, msg) {
+  function onWorkerMessagePlay(worker, msg) {
+    return function() {
 
       var callback = worker.callback[msg.type];
-      var data = msg.data || '';
+      var data = (GQ._notMaster ? msg: msg.data) || '';
+      // console.log('Getting for message play:', msg.type, !!callback);
+      // console.log(msg);
 
-      if(isFunction(callback)) { // callback pattern
-        return delete worker.callback[msg.type], callback(data);
+      // Callback pattern
+      if(isFunction(callback)) { 
+        delete worker.callback[msg.type];
+        return callback(data);
       }
 
-      if(msg.type == 'error' && msg.t_id == NULL) { // uncaughtException
+      // uncaughtException
+      if(msg.type == 'error' && msg.t_id == NULL) { 
         moveAllToErrorState(new Error(data[0] || 'uncaughtException'), worker);
         GQ.emit('error', data[0]);
         return;
       }
 
+      // Error
       if(msg.type == 'error') {
         moveToFinishQ(new Error(data[0] || 'error'), worker, msg.t_id);
         GQ.emit('error', data[0], msg.t_id);
         return;
       }
 
+      // End
       if(msg.type == 'end') {
         moveToFinishQ('finished', worker, msg.t_id);
         GQ.emit('_progress', msg.t_id, data);
@@ -195,9 +239,10 @@ function create(options) {
         return;
       }
 
+      // Data
       return GQ.emit('data', msg.t_id, msg.type, data);
 
-    }.bind(this, arguments[0], arguments[1]);
+    }; // <-- return function() { ... } <--
   }
 
 }
@@ -213,19 +258,28 @@ function _nextTask(GQ) {
   if(worker == NULL) {
     return GQ.emit('busy');
   }
-  
-  worker.send({
+
+  GQ.workerInteract(worker, {
     task_id: task._id,
     task: task.read()
   });
 
 }
 
+/**
+ * 
+ * @param pkg
+ * @param commands
+ * @param opts
+ * @param callback
+ * @param _emitter_
+ * @returns
+ */
 function enqueue(pkg, commands, opts, callback, _emitter_) {
 
   var GQ = this, ee = _emitter_;
 
-  // before queue ready
+  // Before queue ready
   if(isArray(GQ._ready)) {
     ee = new Emitter(), GQ._ready.push(function() {
       GQ.enqueue(pkg, commands, opts, callback, ee);
@@ -235,9 +289,10 @@ function enqueue(pkg, commands, opts, callback, _emitter_) {
 
   // [pkg], commands [,opts][,callback]
   if(!is('string', pkg)) { // package name is not specified
-    callback = opts, opts = commands, commands = pkg, pkg = 'package.json'
+    callback = opts, opts = commands, commands = pkg;
+    pkg = 'package.json'
   }
-  
+
   // argument.length == 2
   if(isFunction(opts)) {
     callback = opts, opts = {};
@@ -263,31 +318,33 @@ function enqueue(pkg, commands, opts, callback, _emitter_) {
 
   var fn = function() {
 
-    if(opts.rank[0] > opts.rank[1])
-      opts.rank = [opts[1], opts[0]];
+    if(opts.rank[0] > opts.rank[1]) opts.rank = [opts[1], opts[0]];
 
     var ok = FALSE, ra = opts.rank[1], task = NULL, _q = NULL;
-    while(ok === FALSE && ra >= 0) {
-      
+    while (ok === FALSE && ra >= 0) {
+
       _q = GQ._q[ra];
       if(!_q) {
         ra--;
         continue;
       }
       task = new Task(pkg, commands, ra, opts.timeout, opts.workdir);
-      
+
       if(_q.push(task)) {
         ok = TRUE;
         break;
       }
-      task.destroy(), ra--;
-      
+
+      task.destroy();
+      ra--;
+
     }
 
     if(ok === FALSE) {
       return ee.emit('error', new Error('Failed to enqueueing.'), task);
+    } else {
+      return ee.emit('end', task._id, task), _nextTask(GQ);
     }
-    return ee.emit('end', task._id, task), _nextTask(GQ);
 
   };
 
@@ -296,33 +353,46 @@ function enqueue(pkg, commands, opts, callback, _emitter_) {
 
 }
 
+/**
+ * 
+ * @param task_id
+ * @param raw
+ * @returns
+ */
 function confirm(task_id, raw) {
   var GQ = this;
   var task = _seekTaskById(GQ, task_id);
   return task && (raw ? task: task.state());
 }
 
+/**
+ * 
+ * @param task_id
+ * @param callback
+ * @returns
+ */
 function progress(task_id, callback) {
 
   var GQ = this, line = [], ee = NULL;
   var task = _seekTaskById(GQ, task_id), state = NULL, worker = NULL;
 
   line.push(_.caught(function(next) {
-    if(!task)
+
+    if(!task) {
       return end('not-in-queue');
+    }
+
     state = task.state();
-    if(!is('string', state))
-      return end('error', state);
-    if(state == 'pending')
-      return end('pending', 0);
-    if(state == 'finished')
-      return end('finished', 100);
+    if(!is('string', state)) return end('error', state);
+    if(state == 'pending') return end('pending', 0);
+    if(state == 'finished') return end('finished', 100);
     next();
+
   }, error));
 
   line.push(_.caught(function(next) {
     _forEachWorker(GQ, function(targ) {
-      targ.working[task_id] && (worker = targ);
+      if(targ.working[task_id]) worker = targ;
     });
     if(!worker) {
       return end('memory-trash');
@@ -335,7 +405,7 @@ function progress(task_id, callback) {
     worker.callback[_cid] = function(data) {
       end(state, data);
     };
-    worker.send({
+    GQ.workerInteract(worker, {
       cmd: 'taskProgress',
       _id: _cid,
       task_id: task_id
@@ -356,6 +426,11 @@ function progress(task_id, callback) {
 
 }
 
+/**
+ * 
+ * @param task_id
+ * @returns
+ */
 function dequeue(task_id) {
   var GQ = this;
   [].concat(task_id).forEach(function(task_id) {
@@ -383,8 +458,12 @@ function dequeue(task_id) {
   });
 }
 
+/**
+ * 
+ * @returns
+ */
 function destroy() {
-  
+
   var GQ = this;
   Task.forEachTask(function(task) {
     task.destroy();
@@ -395,9 +474,45 @@ function destroy() {
 
 }
 
+/**
+ * 
+ */
+function message(m) {
+  var GQ = this;
+  return GQ.emit(Event.message, m);
+}
+
+/**
+ * @param worker
+ * @param func
+ * @returns
+ */
+function workerListener(worker, func) {
+  var GQ = this;
+  if(GQ._notMaster) {
+    worker.on(Event.Interact, func);
+  } else {
+    worker.on('message', func);
+  }
+}
+
+/**
+ * @param worker
+ * @param obj
+ * @returns
+ */
+function workerInteract(worker, obj) {
+  var GQ = this;
+  if(GQ._notMaster) {
+    worker.emit(Event.Interact, obj);
+  } else {
+    worker.send(obj);
+  }
+}
+
 function _seekNextTask(GQ) {
   var ra = GQ._q.length - 1;
-  while(ra >= 0) {
+  while (ra >= 0) {
     var nextTask = GQ._q[ra].next(function(task) {
       return task.state() == 'pending';
     });
@@ -411,10 +526,10 @@ function _seekNextTask(GQ) {
 function _seekAvailWorker(GQ, task) {
   var len = GQ._workers.length, idx = GQ._worker_idx, cnt = len;
   var worker = NULL;
-  while(cnt--) {
+  while (cnt--) {
     worker = GQ._workers[idx == len ? (idx = 0): idx];
     if(worker.max_working > Object.keys(worker.working).length) {
-      
+
       // Set timer
       worker.working[task._id] = setTimeout(function() {
         GQ.emit('timeout', task);
@@ -423,11 +538,11 @@ function _seekAvailWorker(GQ, task) {
           args: ['Timeout limit expired.', task._id, task],
         });
       }, task.timeout());
-      
+
       // Set begin time and state
       task.timer(new Date()), task.state('processing');
       return worker;
-      
+
     }
     worker = NULL, idx++;
   }
@@ -453,7 +568,8 @@ function _forEachWorker(GQ, fn) {
 
 // --------- //
 function each(obj, func) {
-  for(var k in obj) func(k, obj[k]);
+  for( var k in obj)
+    func(k, obj[k]);
 }
 function extend() {
   return _.extend.apply(_, arguments);
@@ -464,6 +580,6 @@ function is(ty, x) {
 function isFunction(x) {
   return is('function', x);
 }
-function isArray(x) { 
+function isArray(x) {
   return Array.isArray(x);
 }
