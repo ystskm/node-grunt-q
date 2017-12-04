@@ -197,8 +197,13 @@ function create(options) {
       }
 
       // TODO !task
-      GQ._q[task.rank()].dequeue(task), task.state(state);
-      GQ._fq[task_id] = task, delete worker.working[task_id];
+      var _q = GQ._q[task.rank()];
+      if(_q) {
+        _q.dequeue(task);
+      }
+      task.state(state);
+      GQ._fq[task_id] = task;
+      delete worker.working[task_id];
 
     })(Task.getById(task_id));
   }
@@ -440,15 +445,15 @@ function dequeue(task_id) {
       throw new Error('The task is not found. Task#' + task_id);
     }
 
-    if(!is('string', task.state())) { // error state
+    var task_s = task.state();
+    if(!is('string', task_s)) { // error state
       return task.destroy(), delete GQ._fq[task_id];
     }
-
-    if(task.state() === 'pending') {
-      return task.destroy(), GQ._q[task.rank()].dequeue(task);
+    if(task_s === 'pending') {
+      var _q = GQ._q[task.rank()];
+      return task.destroy(), !_q || _q.dequeue(task);
     }
-
-    if(task.state() === 'finished') {
+    if(task_s === 'finished') {
       return task.destroy(), delete GQ._fq[task_id];
     }
 
