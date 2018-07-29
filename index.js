@@ -211,28 +211,45 @@ function create(options) {
   function onWorkerMessagePlay(worker, msg) {
     return function() {
 
-      var callback = worker.callback[msg.type];
-      var data = (GQ._notMaster ? msg: msg.data) || '';
+      var callback = worker.callback[ msg.type ];
+      var data = (GQ._notMaster ? msg.data: msg) || '';
+      var er;
       // console.log('Getting for message play:', msg.type, !!callback);
       // console.log(msg);
 
       // Callback pattern
       if(isFunction(callback)) { 
-        delete worker.callback[msg.type];
+        delete worker.callback[ msg.type ];
         return callback(data);
       }
 
-      // uncaughtException
+      // uncaughtException => MUST BE FIXED NOT TO HANG SOME TASK!
       if(msg.type == 'error' && msg.t_id == NULL) { 
-        moveAllToErrorState(new Error(data[0] || 'uncaughtException'), worker);
-        GQ.emit('error', data[0]);
+        console.log(new Date().toGMTString() + ' - [GRUNT QUEUE] ERROR MESSAGE RECEIVES (UNKNOWN TASK)', worker.pid, msg);
+        if(data[0]) {
+          er = new Error(data[0]);
+          er.where = data[1];
+          er.stack = data[2];
+        } else {
+          er = new Error('Grunt uncaughtException')
+        }
+        moveAllToErrorState(er, worker);
+        GQ.emit('error', er);
         return;
       }
 
       // Error
       if(msg.type == 'error') {
-        moveToFinishQ(new Error(data[0] || 'error'), worker, msg.t_id);
-        GQ.emit('error', data[0], msg.t_id);
+        console.log(new Date().toGMTString() + ' - [GRUNT QUEUE] ERROR MESSAGE RECEIVES', worker.pid, msg);
+        if(data[0]) {
+          er = new Error(data[0]);
+          er.where = data[1];
+          er.stack = data[2];
+        } else {
+          er = new Error('Grunt task error')
+        }
+        moveToFinishQ(er, worker, msg.t_id);
+        GQ.emit('error', er, msg.t_id);
         return;
       }
 
