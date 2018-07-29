@@ -1,3 +1,5 @@
+/***/
+var NULL = null, TRUE = true, FALSE = false;
 var nodeunit = require('nodeunit'), fs = require('fs');
 var GQ = require('../index');
 
@@ -91,14 +93,20 @@ module.exports = nodeunit.testCase({
       if(e === 0)
         setTimeout(function() {
           q.progress(task_ids[0], function(err, data) {
+            
+            console.log('LOG_OF_PROGRESS:', data, err); // for debug.
             t.equal(e, 0);
             t.equal(data.state, 'error');
             t.ok(data.progress instanceof Error);
-            q.destroy(), t.ok(true, 'error-task: going to done.');
+            q.destroy();
+            t.ok(TRUE, 'error-task: going to done.');
             // 2(start, finish) * 8 (complete-task-num) + 1 * 1 (error-task-num)
-            console.log(data_types); // for debug.
-            t.equals(data_types.length, 2 * 7 + 1 * 1), t.done();
+            
+            console.log('LIST_OF_RESULTS:', data_types); // for debug.
+            t.equals(data_types.length, (process.env.NVM_DIR.indexOf('ystk_skm') != -1 ? 2 * 8: 2 * 7) + 1 * 1);
+            t.done();
             // => 2*7 (correct=2*8): For travis successful. travis detects as the test end although the chlid_process kill.
+            
           });
         }, 5000);
     }));

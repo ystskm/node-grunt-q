@@ -212,7 +212,7 @@ function create(options) {
     return function() {
 
       var callback = worker.callback[ msg.type ];
-      var data = (GQ._notMaster ? msg.data: msg) || '';
+      var data = msg.data != NULL ? msg.data: msg, darr = data || [ ];
       var er;
       // console.log('Getting for message play:', msg.type, !!callback);
       // console.log(msg);
@@ -226,10 +226,10 @@ function create(options) {
       // uncaughtException => MUST BE FIXED NOT TO HANG SOME TASK!
       if(msg.type == 'error' && msg.t_id == NULL) { 
         console.log(new Date().toGMTString() + ' - [GRUNT QUEUE] ERROR MESSAGE RECEIVES (UNKNOWN TASK)', worker.pid, msg);
-        if(data[0]) {
-          er = new Error(data[0]);
-          er.where = data[1];
-          er.stack = data[2];
+        if(darr[0]) {
+          er = new Error(darr[0]);
+          er.where = darr[1];
+          er.stack = darr[2];
         } else {
           er = new Error('Grunt uncaughtException')
         }
@@ -241,10 +241,10 @@ function create(options) {
       // Error
       if(msg.type == 'error') {
         console.log(new Date().toGMTString() + ' - [GRUNT QUEUE] ERROR MESSAGE RECEIVES', worker.pid, msg);
-        if(data[0]) {
-          er = new Error(data[0]);
-          er.where = data[1];
-          er.stack = data[2];
+        if(darr[0]) {
+          er = new Error(darr[0]);
+          er.where = darr[1];
+          er.stack = darr[2];
         } else {
           er = new Error('Grunt task error')
         }
